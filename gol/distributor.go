@@ -126,27 +126,22 @@ func calculateAliveCells(p Params, world [][]byte) []Cell {
 func distributor(p Params, c distributorChannels) {
 
 
+  c.ioCommand <- ioInput
   
 	// TODO: Create a 2D slice to store the world.
   world := make([][]byte, p.ImageHeight)
   for row := range world {
     world[row] = make([]byte, p.ImageWidth)
   }
-  
-
-	turn := 0
-
-  var chans ioChannels
-  chans.command = c.ioCommand
-  chans.output = c.ioOutput
-  chans.input = c.ioInput
-  chans.idle = c.ioIdle
-  chans.filename = c.ioFilename
-
 
 	// TODO: Execute all turns of the Game of Life.
-  go startIo(p, c)
+  for turn:=0; turn < p.Turns; turn++ {
 
+
+  
+  }
+
+  c.ioCommand <- ioInput
 	// TODO: Report the final state using FinalTurnCompleteEvent.
 
 
