@@ -2,6 +2,7 @@ package gol
 
 import (
 	"fmt"
+  "uk.ac.bris.cs/gameoflife/util"
 )
 
 type distributorChannels struct {
@@ -13,7 +14,19 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 }
 
+func getAliveCells(world [][]byte, p Params) []util.Cell {
 
+	cells := []util.Cell{}
+
+	for i := range world {
+		for j := range world[i] {
+			if world[i][j] == 255 {
+				cells = append(cells, util.Cell{X: j, Y: i})
+			}
+		}
+	}
+	return cells
+}
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 
