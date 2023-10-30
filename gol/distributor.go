@@ -15,27 +15,33 @@ type distributorChannels struct {
 }
 
 func distribute(world [][]byte, p Params) [][]byte {
+
+  // initialise slice of channels to maintain order 
+  // when sending tasks to worker threads
   channels := make([]chan [][]byte, p.Threads)
   for i := range channels {
     channels[i] = make(chan [][]byte)
   }
+
+  // this is a rough even split to separate between workers
   heightDiff := p.ImageHeight / p.Threads  
+
   // sets up workers for all except last slice
   for i := 0; i < p.Threads - 1; i++ {
     go worker(world, p, i * heightDiff, (i + 1) * heightDiff, channels[i])
   }
+
   // sets up worker for last slice, necessary to correct
   // for inconsistencies with rounding
   go worker(world, p, (p.Threads - 1) * heightDiff, p.ImageHeight, channels[p.Threads - 1])
 
   var newWorld [][]byte
+
+  // appends each individual slice to the resulting next state
+  // maintains order 
   for i := 0; i < p.Threads; i++ {
     thisSlice := <- channels[i]
     newWorld = append(newWorld, thisSlice...)
-    //cells := getAliveCells(newWorld, p)
-    //if len(cells) != 0 {
-      //fmt.Println(cells)
-    //}
   }
   return newWorld 
 }
@@ -44,6 +50,8 @@ func getAliveCells(world [][]byte, p Params) []util.Cell {
 
 	cells := []util.Cell{}
 
+  // counts the number of cells which correspond 
+  // to an on value (255)
 	for i := range world {
 		for j := range world[i] {
 			if world[i][j] == 255 {
@@ -60,6 +68,7 @@ func distributor(p Params, c distributorChannels) {
 	c.ioFilename <- fmt.Sprintf("%d%s%d", p.ImageWidth, "x", p.ImageHeight)
 
 	// make 2d slice to hold world
+  // pipe input for each value from the stream input channel
 	world := make([][]byte, p.ImageHeight)
 	for i := range world {
 		world[i] = make([]byte, p.ImageWidth)
@@ -70,13 +79,12 @@ func distributor(p Params, c distributorChannels) {
 
 	turn := 0
 
-	// TODO: Execute all turns of the Game of Life.
+  // distributes tasks for each turn depending on number of threads 
 	for turn = 0; turn < p.Turns; turn++ {
 		world = distribute(world, p)
 		c.events <- TurnComplete{CompletedTurns: turn}
 	}
 
-	// TODO: Report the final state using FinalTurnCompleteEvent.
 	c.events <- FinalTurnComplete{turn, getAliveCells(world, p)}
 
 	// Make sure that the Io has finished any output before exiting.

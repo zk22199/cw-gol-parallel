@@ -11,25 +11,33 @@ func worker(world [][]byte, p Params, startY, endY int, out chan [][]byte) {
 
 	// check each cell in the appropriate portion of the world
   for i := range world[startY:endY] {
+
+    // variable necessary to differentiate between local slice 
+    // coordinates and global world coordinates
     worldIndex := startY + i
+
 		for j := range world[worldIndex] {
 
 			sum := 0
 
-			// alive neighbour count
+			// counts the number of alive neighbours
 			for m := -1; m <= 1; m++ {
 				for n := -1; n <= 1; n++ {
+
+          // the value of the currently observed cell
+          // should not be added to the sum
 					if m != 0 || n != 0 {
 						dy := (worldIndex + m + p.ImageHeight) % p.ImageHeight
 						dx := (j + n + p.ImageWidth) % p.ImageWidth
 
+            // byte values of 255 to 1 for proccessing
 						sum += (int(world[dy][dx]) / 255)
-
 					}
 				}
 			}
 
-			// apply rules
+			// apply rules corresponding to the total surronding alive
+      // cells in context for the state of the current cell
 			if sum == 3 || (int(world[worldIndex][j])/255)+sum == 3 {
 				newworld[i][j] = 255
 			}
