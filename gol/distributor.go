@@ -163,9 +163,6 @@ func distributor(p Params, c distributorChannels) {
 		c.events <- TurnComplete{CompletedTurns: turn + 1}
 	}
 
-	// TODO: Report the final state using FinalTurnCompleteEvent.
-	c.events <- FinalTurnComplete{turn, getAliveCells(world)}
-
 	//send final world to save in file
 	c.ioCommand <- ioOutput
 	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
@@ -175,6 +172,9 @@ func distributor(p Params, c distributorChannels) {
 			c.ioOutput <- world[i][j]
 		}
 	}
+
+	// Report the final state using FinalTurnCompleteEvent.
+	c.events <- FinalTurnComplete{turn, getAliveCells(world)}
 
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
