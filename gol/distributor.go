@@ -84,6 +84,7 @@ func getAliveCells(world [][]byte) []util.Cell {
 }
 
 func aliveTicker(out chan<- bool) {
+	// ticker that sends a true signal down an output channel every 2 seconds
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -94,11 +95,15 @@ func aliveTicker(out chan<- bool) {
 	}
 }
 
+//func pgmWriter(newworld [][]byte, world [][]byte, c distributorChannels){}
+
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 
+	filename := fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
+
 	c.ioCommand <- ioInput
-	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
+	c.ioFilename <- filename
 
 	// make 2d slice to hold world
 	world := make([][]byte, p.ImageWidth)
@@ -146,19 +151,30 @@ func distributor(p Params, c distributorChannels) {
 			}
 		}
 
-		world = tworld
+		//pgmWriter(tworld, world, c)
 
 		select {
 		case <-count:
-			c.events <- AliveCellsCount{turn + 1, len(getAliveCells(world))}
+			c.events <- AliveCellsCount{turn, len(getAliveCells(world))}
 		default:
 		}
 
+		world = tworld
 		c.events <- TurnComplete{CompletedTurns: turn + 1}
 	}
 
 	// TODO: Report the final state using FinalTurnCompleteEvent.
 	c.events <- FinalTurnComplete{turn, getAliveCells(world)}
+
+	//send final world to save in file
+	c.ioCommand <- ioOutput
+	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
+
+	for i := range world {
+		for j := range world[i] {
+			c.ioOutput <- world[i][j]
+		}
+	}
 
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
