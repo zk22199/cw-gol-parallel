@@ -127,7 +127,7 @@ func distributor(p Params, c distributorChannels) {
 	bt := int(math.Log2(float64(p.Threads)))
 	vthreads := int(math.Pow(2, float64(bt)))
 
-	// TODO: Execute all turns of the Game of Life.
+	// Execute all turns of the Game of Life.
 	for turn = 0; turn < p.Turns; turn++ {
 
 		// temp world to hold new data
