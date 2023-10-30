@@ -20,8 +20,10 @@ type distributorChannels struct {
 
 func advanceWorld(world [][]byte, p Params, startY, endY int) [][]byte {
 
+	//fmt.Printf("sY: %d, eY: %d\n", startY, endY)
+
 	//world the size of this routines parameters
-	newworld := make([][]byte, endY-startY+1) //adding 1 here to avoid an out-of-range error
+	newworld := make([][]byte, endY-startY)
 	for i := range newworld {
 		newworld[i] = make([]byte, p.ImageHeight)
 	}
@@ -39,6 +41,8 @@ func advanceWorld(world [][]byte, p Params, startY, endY int) [][]byte {
 						dx := (i + m + p.ImageWidth) % (p.ImageWidth)
 						dy := (j + n + p.ImageHeight) % (p.ImageHeight)
 
+						//fmt.Printf("%d-%d | i: %d, i-y: %d: j: %d, dx: %d, dy: %d\n", startY, endY, i, i-startY, j, dx, dy)
+
 						sum += (int(world[dx][dy]) / 255)
 
 					}
@@ -47,7 +51,10 @@ func advanceWorld(world [][]byte, p Params, startY, endY int) [][]byte {
 
 			//apply rules
 			if sum == 3 || (int(world[i][j])/255)+sum == 3 {
-				newworld[i][j] = 255
+				// correct for i/j being offset
+				//fmt.Printf("%d-%d | i: %d, i-y: %d: j: %d, j-y:%d\n", startY, endY, i, i-startY, j, j-endY)
+				ni := i - startY
+				newworld[ni][j] = 255
 			}
 		}
 	}
