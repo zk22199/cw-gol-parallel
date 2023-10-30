@@ -3,6 +3,7 @@ package gol
 import (
 	"fmt"
 	"math"
+	"time"
 
 	//"strconv"
 
@@ -68,7 +69,7 @@ func worker(world [][]byte, p Params, startY, endY int, out chan<- [][]byte) {
 	out <- output
 }
 
-func getAliveCells(world [][]byte, p Params) []util.Cell {
+func getAliveCells(world [][]byte) []util.Cell {
 
 	cells := []util.Cell{}
 
@@ -80,6 +81,17 @@ func getAliveCells(world [][]byte, p Params) []util.Cell {
 		}
 	}
 	return cells
+}
+
+func aliveTicker(out chan<- bool) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			out <- true
+		}
+	}
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
@@ -100,6 +112,10 @@ func distributor(p Params, c distributorChannels) {
 
 	// to track turns
 	turn := 0
+
+	// to track whether alivecells should be counted
+	count := make(chan bool)
+	go aliveTicker(count)
 
 	// only use a power of 2 for thread count
 	// we cannot divide a 16x16 image by 3 for example...
@@ -131,11 +147,18 @@ func distributor(p Params, c distributorChannels) {
 		}
 
 		world = tworld
-		c.events <- TurnComplete{CompletedTurns: turn}
+
+		select {
+		case <-count:
+			c.events <- AliveCellsCount{turn + 1, len(getAliveCells(world))}
+		default:
+		}
+
+		c.events <- TurnComplete{CompletedTurns: turn + 1}
 	}
 
 	// TODO: Report the final state using FinalTurnCompleteEvent.
-	c.events <- FinalTurnComplete{turn, getAliveCells(world, p)}
+	c.events <- FinalTurnComplete{turn, getAliveCells(world)}
 
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
