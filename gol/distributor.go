@@ -1,10 +1,8 @@
 package gol
 
 import (
-	"fmt"
-	//"strconv"
-
-	"uk.ac.bris.cs/gameoflife/util"
+  "uk.ac.bris.cs/gameoflife/util"
+  "fmt"
 )
 
 type distributorChannels struct {
@@ -16,45 +14,44 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 }
 
-func executeTurn(world [][]byte, p Params) [][]byte {
-	newworld := make([][]byte, p.ImageWidth)
-	for i := range newworld {
-		newworld[i] = make([]byte, p.ImageHeight)
-	}
+func distribute(world [][]byte, p Params) [][]byte {
 
-	// check each cell in world
-	for i := range world {
-		for j := range world[i] {
+  // initialise slice of channels to maintain order 
+  // when sending tasks to worker threads
+  channels := make([]chan [][]byte, p.Threads)
+  for i := range channels {
+    channels[i] = make(chan [][]byte)
+  }
 
-			sum := 0
+  // this is a rough even split to separate between workers
+  heightDiff := p.ImageHeight / p.Threads  
 
-			// alive neighbour count
-			for m := -1; m <= 1; m++ {
-				for n := -1; n <= 1; n++ {
-					if m != 0 || n != 0 {
-						dx := (i + m + p.ImageWidth) % p.ImageWidth
-						dy := (j + n + p.ImageHeight) % p.ImageHeight
+  // sets up workers for all except last slice
+  for i := 0; i < p.Threads - 1; i++ {
+    go worker(world, p, i * heightDiff, (i + 1) * heightDiff, channels[i])
+  }
 
-						sum += (int(world[dx][dy]) / 255)
+  // sets up worker for last slice, necessary to correct
+  // for inconsistencies with rounding
+  go worker(world, p, (p.Threads - 1) * heightDiff, p.ImageHeight, channels[p.Threads - 1])
 
-					}
-				}
-			}
+  var newWorld [][]byte
 
-			//apply rules
-			if sum == 3 || (int(world[i][j])/255)+sum == 3 {
-				newworld[i][j] = 255
-			}
-		}
-	}
-
-	return newworld
+  // appends each individual slice to the resulting next state
+  // maintains order 
+  for i := 0; i < p.Threads; i++ {
+    thisSlice := <- channels[i]
+    newWorld = append(newWorld, thisSlice...)
+  }
+  return newWorld 
 }
 
 func getAliveCells(world [][]byte, p Params) []util.Cell {
 
 	cells := []util.Cell{}
 
+  // counts the number of cells which correspond 
+  // to an on value (255)
 	for i := range world {
 		for j := range world[i] {
 			if world[i][j] == 255 {
@@ -64,7 +61,6 @@ func getAliveCells(world [][]byte, p Params) []util.Cell {
 	}
 	return cells
 }
-
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 
@@ -72,9 +68,10 @@ func distributor(p Params, c distributorChannels) {
 	c.ioFilename <- fmt.Sprintf("%d%s%d", p.ImageWidth, "x", p.ImageHeight)
 
 	// make 2d slice to hold world
-	world := make([][]byte, p.ImageWidth)
+  // pipe input for each value from the stream input channel
+	world := make([][]byte, p.ImageHeight)
 	for i := range world {
-		world[i] = make([]byte, p.ImageHeight)
+		world[i] = make([]byte, p.ImageWidth)
 		for j := range world[i] {
 			world[i][j] = <-c.ioInput
 		}
@@ -82,13 +79,12 @@ func distributor(p Params, c distributorChannels) {
 
 	turn := 0
 
-	// TODO: Execute all turns of the Game of Life.
+  // distributes tasks for each turn depending on number of threads 
 	for turn = 0; turn < p.Turns; turn++ {
-		world = executeTurn(world, p)
+		world = distribute(world, p)
 		c.events <- TurnComplete{CompletedTurns: turn}
 	}
 
-	// TODO: Report the final state using FinalTurnCompleteEvent.
 	c.events <- FinalTurnComplete{turn, getAliveCells(world, p)}
 
 	// Make sure that the Io has finished any output before exiting.
