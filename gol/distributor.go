@@ -77,8 +77,22 @@ func aliveTicker(out chan<- bool) {
 	}
 }
 
-func saveBoard(world [][]byte, p Params, c distributorChannels) {
+func saveBoard(world [][]byte, turn int, p Params, c distributorChannels) {
 
+	filename := fmt.Sprintf("%dx%dx%d", p.ImageWidth, p.ImageHeight, turn)
+
+	// get writePgmImage ready to recieve our world
+	c.ioCommand <- ioOutput
+	c.ioFilename <- filename
+
+	// pipe the world byte by byte into ioOuput channel, for use in writePgmImage
+	for i := range world {
+		for j := range world[i] {
+			c.ioOutput <- world[i][j]
+		}
+	}
+
+	c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: filename}
 }
 
 // distributor divides the work between workers and interacts with other goroutines.
@@ -112,6 +126,8 @@ func distributor(p Params, c distributorChannels) {
 	count := make(chan bool)
 	go aliveTicker(count)
 
+	//isPaused := false
+
 	// distributes tasks for each turn depending on number of threads
 	for turn = 0; turn < p.Turns; turn++ {
 		world = distribute(world, p, c, turn)
@@ -120,17 +136,23 @@ func distributor(p Params, c distributorChannels) {
 
 		// selects appropriate action based on keyboard presses/ ticker
 		select {
-		case <-count: //ticker call
-			c.events <- AliveCellsCount{turn + 1, len(getAliveCells(world))}
 		case key := <-c.keyPress:
 			switch key {
 			case 's':
-				saveBoard(world, p, c)
+				saveBoard(world, turn, p, c)
 			case 'q':
-				saveBoard(world, p, c)
+				saveBoard(world, turn, p, c)
 			case 'p':
-				time.Sleep(2)
+				c.events <- StateChange{turn, Paused}
+				for {
+					if <-c.keyPress == 'p' {
+						break
+					}
+				}
+				c.events <- StateChange{turn, Executing}
 			}
+		case <-count: //ticker call
+			c.events <- AliveCellsCount{turn + 1, len(getAliveCells(world))}
 		default:
 		}
 
@@ -140,7 +162,7 @@ func distributor(p Params, c distributorChannels) {
 	c.events <- FinalTurnComplete{turn, getAliveCells(world)}
 
 	// save the world as a pgm file
-	saveBoard(world, p, c)
+	saveBoard(world, turn, p, c)
 
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
