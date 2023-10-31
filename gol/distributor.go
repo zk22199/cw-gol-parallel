@@ -14,6 +14,7 @@ type distributorChannels struct {
 	ioFilename chan<- string
 	ioOutput   chan<- uint8
 	ioInput    <-chan uint8
+	keyPress   <-chan rune
 }
 
 func distribute(world [][]byte, p Params, c distributorChannels, t int) [][]byte {
@@ -76,6 +77,10 @@ func aliveTicker(out chan<- bool) {
 	}
 }
 
+func saveBoard(world [][]byte, p Params, c distributorChannels) {
+
+}
+
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 
@@ -117,6 +122,15 @@ func distributor(p Params, c distributorChannels) {
 		select {
 		case <-count: //ticker call
 			c.events <- AliveCellsCount{turn + 1, len(getAliveCells(world))}
+		case <-c.keyPress:
+			select {
+			case "s":
+				saveBoard(world, p, c)
+			case "q":
+				saveBoard(world, p, c)
+			case "p":
+				time.Sleep(2)
+			}
 		default:
 		}
 
@@ -125,16 +139,8 @@ func distributor(p Params, c distributorChannels) {
 	// Report the final turn being complete
 	c.events <- FinalTurnComplete{turn, getAliveCells(world)}
 
-	// get writePgmImage ready to recieve our world
-	c.ioCommand <- ioOutput
-	c.ioFilename <- fmt.Sprintf("%dx%dx%d", p.ImageWidth, p.ImageHeight, p.Turns)
-
-	// pipe the world byte by byte into ioOuput channel, for use in writePgmImage
-	for i := range world {
-		for j := range world[i] {
-			c.ioOutput <- world[i][j]
-		}
-	}
+	// save the world as a pgm file
+	saveBoard(world, p, c)
 
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
