@@ -111,6 +111,15 @@ func distributor(p Params, c distributorChannels) {
 
 	c.events <- FinalTurnComplete{turn, getAliveCells(world)}
 
+	c.ioCommand <- ioOutput
+	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
+
+	for i := range world {
+		for j := range world[i] {
+			c.ioOutput <- world[i][j]
+		}
+	}
+
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
