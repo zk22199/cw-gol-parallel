@@ -122,8 +122,8 @@ func distributor(p Params, c distributorChannels) {
 		select {
 		case <-count: //ticker call
 			c.events <- AliveCellsCount{turn + 1, len(getAliveCells(world))}
-		case <-c.keyPress:
-			select {
+		case key<-c.keyPress:
+			select key{
 			case "s":
 				saveBoard(world, p, c)
 			case "q":
