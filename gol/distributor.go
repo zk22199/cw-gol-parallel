@@ -141,7 +141,7 @@ func distributor(p Params, c distributorChannels) {
 			case 's':
 				saveBoard(world, turn, p, c)
 			case 'q':
-				saveBoard(world, turn, p, c)
+				p.Turns = turn
 			case 'p':
 				c.events <- StateChange{turn, Paused}
 				for {
