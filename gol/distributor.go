@@ -101,19 +101,25 @@ func distributor(p Params, c distributorChannels) {
 	// distributes tasks for each turn depending on number of threads
 	for turn = 0; turn < p.Turns; turn++ {
 		world = distribute(world, p)
+
+		// selects appropriate action based on keyboard presses/ ticker
 		select {
-		case <-count:
+		case <-count: //ticker call
 			c.events <- AliveCellsCount{turn + 1, len(getAliveCells(world))}
 		default:
 		}
+
 		c.events <- TurnComplete{CompletedTurns: turn}
 	}
 
+	// Report the final turn being complete
 	c.events <- FinalTurnComplete{turn, getAliveCells(world)}
 
+	// get writePgmImage ready to recieve our world
 	c.ioCommand <- ioOutput
 	c.ioFilename <- fmt.Sprintf("%dx%dx%d", p.ImageWidth, p.ImageHeight, p.Turns)
 
+	// pipe the world byte by byte into ioOuput channel, for use in writePgmImage
 	for i := range world {
 		for j := range world[i] {
 			c.ioOutput <- world[i][j]
