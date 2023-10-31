@@ -16,7 +16,7 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 }
 
-func distribute(world [][]byte, p Params) [][]byte {
+func distribute(world [][]byte, p Params, c distributorChannels, t int) [][]byte {
 
 	// initialise slice of channels to maintain order
 	// when sending tasks to worker threads
@@ -30,12 +30,12 @@ func distribute(world [][]byte, p Params) [][]byte {
 
 	// sets up workers for all except last slice
 	for i := 0; i < p.Threads-1; i++ {
-		go worker(world, p, i*heightDiff, (i+1)*heightDiff, channels[i])
+		go worker(world, p, c, t, i*heightDiff, (i+1)*heightDiff, channels[i])
 	}
 
 	// sets up worker for last slice, necessary to correct
 	// for inconsistencies with rounding
-	go worker(world, p, (p.Threads-1)*heightDiff, p.ImageHeight, channels[p.Threads-1])
+	go worker(world, p, c, t, (p.Threads-1)*heightDiff, p.ImageHeight, channels[p.Threads-1])
 
 	var newWorld [][]byte
 
@@ -94,13 +94,24 @@ func distributor(p Params, c distributorChannels) {
 
 	turn := 0
 
+	// flip all alive cells
+	for i := range world {
+		for j := range world[i] {
+			if world[i][j] == 255 {
+				c.events <- CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: i}}
+			}
+		}
+	}
+
 	// to track whether alivecells should be counted
 	count := make(chan bool)
 	go aliveTicker(count)
 
 	// distributes tasks for each turn depending on number of threads
 	for turn = 0; turn < p.Turns; turn++ {
-		world = distribute(world, p)
+		world = distribute(world, p, c, turn)
+
+		c.events <- TurnComplete{CompletedTurns: turn}
 
 		// selects appropriate action based on keyboard presses/ ticker
 		select {
@@ -109,7 +120,6 @@ func distributor(p Params, c distributorChannels) {
 		default:
 		}
 
-		c.events <- TurnComplete{CompletedTurns: turn}
 	}
 
 	// Report the final turn being complete
