@@ -126,8 +126,6 @@ func distributor(p Params, c distributorChannels) {
 	count := make(chan bool)
 	go aliveTicker(count)
 
-	//isPaused := false
-
 	// distributes tasks for each turn depending on number of threads
 	for turn = 0; turn < p.Turns; turn++ {
 		world = distribute(world, p, c, turn)
@@ -144,11 +142,13 @@ func distributor(p Params, c distributorChannels) {
 				p.Turns = turn
 			case 'p':
 				c.events <- StateChange{turn, Paused}
+				fmt.Printf("Paused on turn %d. Press p to continue... ", turn)
 				for {
 					if <-c.keyPress == 'p' {
 						break
 					}
 				}
+				fmt.Printf("Continuing!\n", turn)
 				c.events <- StateChange{turn, Executing}
 			}
 		case <-count: //ticker call
