@@ -112,7 +112,7 @@ func distributor(p Params, c distributorChannels) {
 	c.events <- FinalTurnComplete{turn, getAliveCells(world)}
 
 	c.ioCommand <- ioOutput
-	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
+	c.ioFilename <- fmt.Sprintf("%dx%dx%d", p.ImageWidth, p.ImageHeight, p.Turns)
 
 	for i := range world {
 		for j := range world[i] {
