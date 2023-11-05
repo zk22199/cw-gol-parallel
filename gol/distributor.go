@@ -115,14 +115,10 @@ func distributor(p Params, c distributorChannels) {
 
 	turn := 0
 
-	// flip all alive cells
-	for i := range world {
-		for j := range world[i] {
-			if world[i][j] == 255 {
-				c.events <- CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: i}}
-			}
-		}
-	}
+  // sends all currently alive cells to sdl
+  for _, cell := range getAliveCells(world) {
+		c.events <- CellFlipped{CompletedTurns: turn, Cell: cell}
+  }
 
 	// to track whether alivecells should be counted
 	count := make(chan bool)
