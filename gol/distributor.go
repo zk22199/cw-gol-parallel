@@ -31,14 +31,11 @@ func distribute(world [][]byte, p Params, c distributorChannels, t int) [][]byte
   // to compute to within 1
 	var heightDiff float64 = float64(p.ImageHeight) / float64(p.Threads)
 
-	// sets up workers for all except last slice
+	// sets up workers for all slices
 	for i := 0; i < p.Threads; i++ {
 		go worker(world, p, c, t, int(math.Floor(float64(i)*heightDiff)), int(math.Floor(float64(i+1)*heightDiff)), channels[i])
 	}
 
-	// sets up worker for last slice, necessary to correct
-	// for inconsistencies with rounding
-	// go worker(world, p, c, t, (p.Threads-1)*heightDiff, p.ImageHeight, channels[p.Threads-1])
 
 	var newWorld [][]byte
 
