@@ -2,9 +2,7 @@ package gol
 
 import (
 	"fmt"
-	"math"
 	"time"
-
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -18,7 +16,7 @@ type distributorChannels struct {
 	keyPress   <-chan rune
 }
 
-func distribute(world [][]byte, p Params, c distributorChannels, t int) [][]byte {
+func distribute(world [][]byte, p Params, c distributorChannels, t int, heightDiff float32) [][]byte {
 
 	// initialise slice of channels to maintain order
 	// when sending tasks to worker threads
@@ -27,13 +25,9 @@ func distribute(world [][]byte, p Params, c distributorChannels, t int) [][]byte
 		channels[i] = make(chan [][]byte)
 	}
 
-	// dead even split to ensure all workers have same number of rows
-  // to compute to within 1
-	var heightDiff float64 = float64(p.ImageHeight) / float64(p.Threads)
-
 	// sets up workers for all slices
 	for i := 0; i < p.Threads; i++ {
-		go worker(world, p, c, t, int(math.Floor(float64(i)*heightDiff)), int(math.Floor(float64(i+1)*heightDiff)), channels[i])
+		go worker(world, p, c, t, int(float32(i)*heightDiff), int(float32(i+1)*heightDiff), channels[i])
 	}
 
 
@@ -121,9 +115,12 @@ func distributor(p Params, c distributorChannels) {
 	count := make(chan bool)
 	go aliveTicker(count)
 
+  // the height of the slices worked on by worker threads
+	var heightDiff float32 = float32(p.ImageHeight) / float32(p.Threads)
+
 	// distributes tasks for each turn depending on number of threads
 	for turn = 0; turn < p.Turns; turn++ {
-		world = distribute(world, p, c, turn)
+		world = distribute(world, p, c, turn, heightDiff)
 
 		c.events <- TurnComplete{CompletedTurns: turn}
 
