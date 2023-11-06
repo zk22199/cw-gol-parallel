@@ -3,7 +3,6 @@ package gol
 import (
 	"fmt"
 	"time"
-
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -14,9 +13,10 @@ type distributorChannels struct {
 	ioFilename chan<- string
 	ioOutput   chan<- uint8
 	ioInput    <-chan uint8
+	keyPress   <-chan rune
 }
 
-func distribute(world [][]byte, p Params) [][]byte {
+func distribute(world [][]byte, p Params, c distributorChannels, t int, heightDiff float32) [][]byte {
 
 	// initialise slice of channels to maintain order
 	// when sending tasks to worker threads
@@ -25,17 +25,11 @@ func distribute(world [][]byte, p Params) [][]byte {
 		channels[i] = make(chan [][]byte)
 	}
 
-	// this is a rough even split to separate between workers
-	heightDiff := p.ImageHeight / p.Threads
-
-	// sets up workers for all except last slice
-	for i := 0; i < p.Threads-1; i++ {
-		go worker(world, p, i*heightDiff, (i+1)*heightDiff, channels[i])
+	// sets up workers for all slices
+	for i := 0; i < p.Threads; i++ {
+		go worker(world, p, c, t, int(float32(i)*heightDiff), int(float32(i+1)*heightDiff), channels[i])
 	}
 
-	// sets up worker for last slice, necessary to correct
-	// for inconsistencies with rounding
-	go worker(world, p, (p.Threads-1)*heightDiff, p.ImageHeight, channels[p.Threads-1])
 
 	var newWorld [][]byte
 
@@ -76,6 +70,24 @@ func aliveTicker(out chan<- bool) {
 	}
 }
 
+func saveBoard(world [][]byte, turn int, p Params, c distributorChannels) {
+
+	filename := fmt.Sprintf("%dx%dx%d", p.ImageWidth, p.ImageHeight, turn)
+
+	// get writePgmImage ready to recieve our world
+	c.ioCommand <- ioOutput
+	c.ioFilename <- filename
+
+	// pipe the world byte by byte into ioOuput channel, for use in writePgmImage
+	for i := range world {
+		for j := range world[i] {
+			c.ioOutput <- world[i][j]
+		}
+	}
+
+	c.events <- ImageOutputComplete{CompletedTurns: turn, Filename: filename}
+}
+
 // distributor divides the work between workers and interacts with other goroutines.
 func distributor(p Params, c distributorChannels) {
 
@@ -94,31 +106,55 @@ func distributor(p Params, c distributorChannels) {
 
 	turn := 0
 
+  // sends all currently alive cells to sdl
+  for _, cell := range getAliveCells(world) {
+		c.events <- CellFlipped{CompletedTurns: turn, Cell: cell}
+  }
+
 	// to track whether alivecells should be counted
 	count := make(chan bool)
 	go aliveTicker(count)
 
+  // the height of the slices worked on by worker threads
+	var heightDiff float32 = float32(p.ImageHeight) / float32(p.Threads)
+
 	// distributes tasks for each turn depending on number of threads
 	for turn = 0; turn < p.Turns; turn++ {
-		world = distribute(world, p)
+		world = distribute(world, p, c, turn, heightDiff)
+
+		c.events <- TurnComplete{CompletedTurns: turn}
+
+		// selects appropriate action based on keyboard presses/ ticker
 		select {
-		case <-count:
+		case key := <-c.keyPress:
+			switch key {
+			case 's':
+				saveBoard(world, turn, p, c)
+			case 'q':
+				p.Turns = turn
+			case 'p':
+				c.events <- StateChange{turn, Paused}
+				fmt.Printf("Paused on turn %d. Press p to continue... ", turn)
+				for {
+					if <-c.keyPress == 'p' {
+						break
+					}
+				}
+				fmt.Printf("Continuing!\n", turn)
+				c.events <- StateChange{turn, Executing}
+			}
+		case <-count: //ticker call
 			c.events <- AliveCellsCount{turn + 1, len(getAliveCells(world))}
 		default:
 		}
-		c.events <- TurnComplete{CompletedTurns: turn}
+
 	}
 
+	// Report the final turn being complete
 	c.events <- FinalTurnComplete{turn, getAliveCells(world)}
 
-	c.ioCommand <- ioOutput
-	c.ioFilename <- fmt.Sprintf("%dx%dx%d", p.ImageWidth, p.ImageHeight, p.Turns)
-
-	for i := range world {
-		for j := range world[i] {
-			c.ioOutput <- world[i][j]
-		}
-	}
+	// save the world as a pgm file
+	saveBoard(world, turn, p, c)
 
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
