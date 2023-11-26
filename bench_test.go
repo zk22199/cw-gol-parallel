@@ -10,6 +10,7 @@ import (
 
 const benchLength = 1000
 
+
 func BenchmarkStudentVersion(b *testing.B) {
 	for threads := 1; threads <= 16; threads++ {
 		os.Stdout = nil // Disable all program output apart from benchmark results
