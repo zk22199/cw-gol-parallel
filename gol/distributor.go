@@ -17,7 +17,7 @@ type distributorChannels struct {
 	keyPress   <-chan rune
 }
 
-func distribute(world [][]byte, p Params, c distributorChannels, t int, heightDiff float32) [][]byte {
+func dispatchWork(world [][]byte, p Params, c distributorChannels, t int, heightDiff float32) [][]byte {
 
 	// initialise slice of channels to maintain order
 	// when sending tasks to worker threads
@@ -120,7 +120,7 @@ func distributor(p Params, c distributorChannels) {
 
 	// distributes tasks for each turn depending on number of threads
 	for turn = 0; turn < p.Turns; turn++ {
-		world = distribute(world, p, c, turn, heightDiff)
+		world = dispatchWork(world, p, c, turn, heightDiff)
 
 		c.events <- TurnComplete{CompletedTurns: turn}
 
