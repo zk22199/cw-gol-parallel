@@ -1,0 +1,32 @@
+# Benchmarking Notes
+
+### Lab setup
+
+```
+GO111MODULE=off go get golang.org/x/perf/cmd/benchstat
+module load anaconda/3-2023
+'''
+
+## Running the benchmarks
+
+### MedianFilter
+
+```
+go test -run ^$ -bench . -benchtime 1x -count 6 | tee results.out
+benchmark -format=csv results.out | results.csv
+python3 plot.py
+```
+Note that count needs to be at least 6 for a good confidence interval.
+You also must remove everything before ```,sec/op,CI``` otherwise plot.py will crash
+
+Your results.csv will look like this:
+```
+name,time/op (ns/op),±
+Filter/1_workers-12,2.94302E+08,0%
+Filter/2_workers-12,1.71727E+08,0%
+Filter/4_workers-12,1.25416E+08,9%
+Filter/8_workers-12,1.11720E+08,22%
+Filter/16_workers-12,1.05144E+08,28%
+```
+
+
