@@ -39,24 +39,24 @@ func worker(world [][]byte, p Params, c distributorChannels, turn int, startY, e
 					}
 				}
 			}
-			
-      var oldstate uint8 = world[worldIndex][j] / 255
+
+			var oldstate uint8 = world[worldIndex][j] / 255
 
 			// apply rules corresponding to the total surronding alive
 			// cells in context for the state of the current cell
-      // ensures flipping of cells only if a change is present
-      if oldstate == 1 {
-        if sum == 2 || sum == 3 {
-				  newworld[i][j] = 255
-        } else {
-				  c.events <- CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: worldIndex}}
-        }
-      } else {
-        if sum == 3 {
-          newworld[i][j] = 255
-          c.events <- CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: worldIndex}}
-        }
-      }
+			// ensures flipping of cells only if a change is present
+			if oldstate == 1 {
+				if sum == 2 || sum == 3 {
+					newworld[i][j] = 255
+				} else {
+					c.events <- CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: worldIndex}}
+				}
+			} else {
+				if sum == 3 {
+					newworld[i][j] = 255
+					c.events <- CellFlipped{CompletedTurns: turn, Cell: util.Cell{X: j, Y: worldIndex}}
+				}
+			}
 		}
 	}
 	// send computed data to the channel provided by the arguments

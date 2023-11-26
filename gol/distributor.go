@@ -3,6 +3,7 @@ package gol
 import (
 	"fmt"
 	"time"
+
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
@@ -29,7 +30,6 @@ func distribute(world [][]byte, p Params, c distributorChannels, t int, heightDi
 	for i := 0; i < p.Threads; i++ {
 		go worker(world, p, c, t, int(float32(i)*heightDiff), int(float32(i+1)*heightDiff), channels[i])
 	}
-
 
 	var newWorld [][]byte
 
@@ -106,16 +106,16 @@ func distributor(p Params, c distributorChannels) {
 
 	turn := 0
 
-  // sends all currently alive cells to sdl
-  for _, cell := range getAliveCells(world) {
+	// sends all currently alive cells to sdl
+	for _, cell := range getAliveCells(world) {
 		c.events <- CellFlipped{CompletedTurns: turn, Cell: cell}
-  }
+	}
 
 	// to track whether alivecells should be counted
 	count := make(chan bool)
 	go aliveTicker(count)
 
-  // the height of the slices worked on by worker threads
+	// the height of the slices worked on by worker threads
 	var heightDiff float32 = float32(p.ImageHeight) / float32(p.Threads)
 
 	// distributes tasks for each turn depending on number of threads
